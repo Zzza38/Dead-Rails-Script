@@ -38,6 +38,8 @@ local NPCNames = {
     ["Model_Horse"] = "Horse",
     ["Model_RifleSolider"] = "Ground Solider",
     ["Model_TurretSolider"] = "Turret Solider",
+    ["Shopkeeper"] = "Shopkeeper"
+
 }
 local readableHighlightModes = {}
 for internalName, mode in pairs(defaultNPCModes) do
@@ -264,7 +266,7 @@ espTab:CreateToggle({
     end,
 })
 espTab:CreateToggle({
-    Name = "Highlight Entities",
+    Name = "Custom Highlight Entities",
     CurrentValue = highlightEnabled,
     Flag = "entityHighlight",
     Callback = function(Value)
@@ -299,7 +301,7 @@ espTab:CreateDropdown({
     Flag = "entityHighlight", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
     Callback = function(Options)
         currentEntity = Options[1]
-        highlightMode = readableHighlightModes[currentEntity]
+        highlightMode = capitalizeFirst(readableHighlightModes[currentEntity])
     end,
 })
 espTab:CreateParagraph({ Title = "", Content =
@@ -312,7 +314,7 @@ espTab:CreateDropdown({
     Flag = "entityHighlight", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
     Callback = function(Options)
         highlightMode = Options
-        playerChosenModes[readableToInternal[currentEntity]] = highlightMode
+        playerChosenModes[readableToInternal[currentEntity]] = string.lower(highlightMode[1])
         importantNPCs = table.clone(playerChosenModes)
     end,
 })

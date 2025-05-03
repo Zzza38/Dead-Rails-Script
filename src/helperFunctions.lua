@@ -104,3 +104,7 @@ function dump(tbl, indent)
         end
     end
 end
+
+function capitalizeFirst(str)
+    return str:sub(1, 1):upper() .. str:sub(2):lower()
+end
