@@ -26,6 +26,7 @@ local defaultNPCModes = {
     ["Model_Horse"] = "ignore",
     ["Model_RifleSolider"] = "none",
     ["Model_TurretSolider"] = "none",
+    ["Shopkeeper"] = "none"
 }
 local playerChosenModes = table.clone(defaultNPCModes)
 local importantNPCs = table.clone(playerChosenModes)
@@ -297,12 +298,7 @@ espTab:CreateDropdown({
     MultipleOptions = false,
     Flag = "entityHighlight", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
     Callback = function(Options)
-        currentEntity = Options
-    end,
-})
-espTab:CreateButton({
-    Name = "Select Entity",
-    Callback = function()
+        currentEntity = Options[1]
         highlightMode = readableHighlightModes[currentEntity]
     end,
 })
