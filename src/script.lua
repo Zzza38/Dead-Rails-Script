@@ -426,6 +426,19 @@ generalTab:CreateButton({
         Rayfield:Destroy()
     end,
 })
+generalTab:CreateButton({
+    Name = "Reload Script",
+    Callback = function()
+        if renderConnection then
+            renderConnection:Disconnect()
+            renderConnection = nil
+        end
+        clearESP()
+        circle.Visible = false
+        loadstring(game:HttpGet("https://github.com/Zzza38/Dead-Rails-Script/raw/refs/heads/main/src/script.lua"))()
+        Rayfield:Destroy()
+    end,
+})
 -- ESP TAB
 espTab:CreateToggle({
     Name = "Only Show Alive Entities",
