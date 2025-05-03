@@ -49,7 +49,7 @@ end
 -- Get length of a table (for dictionary-style)
 function length(tbl)
     local count = 0
-    for _, _ in pairs(tbl) do count += 1 end
+    for _, _ in pairs(tbl) do count = count + 1 end
     return count
 end
 
