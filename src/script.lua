@@ -30,88 +30,203 @@ local Window = Rayfield:CreateWindow({
 local generalTab = Window:CreateTab("General Settings", 4483362458)
 local espTab = Window:CreateTab("ESP", 4483362458)
 
--- Add general settings section
-local generalSection = generalTab:CreateSection("Main Settings", true)
-local espSection = espTab:CreateSection("ESP Options", true)
-
--- Button example
-generalTab:CreateButton({
-    Name = "Button!",
-    Callback = function()
-        print("Button pressed")
-    end
+-- UI: ESP Update Frequency (Slider)
+espTab:CreateSlider({
+	Name = "ESP Refresh Rate (Lower = Faster)",
+	Range = {1, 60},
+	Increment = 1,
+	Suffix = "frames",
+	CurrentValue = espEveryNFrames,
+	Callback = function(Value)
+		espEveryNFrames = Value
+	end
 })
 
--- Toggle examplea
+-- UI: Show Only Alive Targets (Toggle)
+espTab:CreateToggle({
+	Name = "Show Only Living NPCs",
+	CurrentValue = onlyWhenAlive,
+	Callback = function(Value)
+		onlyWhenAlive = Value
+	end
+})
+-- Fullbright (Night Vision) Toggle
 generalTab:CreateToggle({
-    Name = "This is a toggle!",
-    Default = false,
-    Callback = function(Value)
-        print(Value)
-    end
+	Name = "Night Vision (Fullbright)",
+	CurrentValue = nightVisionOn,
+	Callback = function(Value)
+		nightVisionOn = Value
+		if nightVisionOn then
+			enableLighting()
+		else
+			resetLighting()
+		end
+	end
 })
 
--- Colorpicker example
-generalTab:CreateColorPicker({
-    Name = "Color Picker",
-    Default = Color3.fromRGB(255, 0, 0),
-    Callback = function(Value)
-        print(Value)
-    end
+-- ESP Toggle (Same as PGUP)
+generalTab:CreateToggle({
+	Name = "ESP Enabled",
+	CurrentValue = espOn,
+	Callback = function(Value)
+		espOn = Value
+		if not espOn then
+			clearESP()
+		end
+	end
 })
 
--- Slider example
-local Slider = generalTab:CreateSlider({
-    Name = "Slider",
-    Min = 16,
-    Max = 100,
-    Default = 16,
-    Color = Color3.fromRGB(255, 255, 255),
-    Increment = 1,
-    ValueName = "bananas",
-    Callback = function(Value)
-        print(Value)
-    end
+-- Services
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local workspace = game:GetService("Workspace")
+
+local localPlayer = Players.LocalPlayer
+
+-- States
+local nightVisionOn = false
+local espOn = false
+local addedESPModels = {}
+local frameCounter = 0
+local espEveryNFrames = 3
+local onlyWhenAlive = true
+
+-- Lighting control
+local function enableLighting()
+	Lighting.Ambient = Color3.new(1, 1, 1)
+	Lighting.Brightness = 5
+	Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
+	Lighting.ClockTime = 12
+end
+
+local function resetLighting()
+	Lighting.Ambient = Color3.new(0, 0, 0)
+	Lighting.Brightness = 2
+	Lighting.OutdoorAmbient = Color3.new(0, 0, 0)
+end
+
+-- ESP logic
+local function addESP(model)
+	if model:FindFirstChild("Humanoid") and not model:FindFirstChild("ESP_Added") then
+		if Players:GetPlayerFromCharacter(model) then return end
+
+		for _, part in pairs(model:GetDescendants()) do
+			if part:IsA("BasePart") then
+				local box = Instance.new("BoxHandleAdornment")
+				box.Size = part.Size
+				box.Adornee = part
+				box.AlwaysOnTop = true
+				box.ZIndex = 10
+				box.Transparency = 0.5
+				box.Color3 = Color3.new(1, 0, 0)
+				box.Name = "ESPBox"
+				box.Parent = part
+			end
+		end
+
+		local head = model:FindFirstChild("Head")
+		if head then
+			local billboard = Instance.new("BillboardGui")
+			billboard.Name = "NameESP"
+			billboard.Size = UDim2.new(0, 100, 0, 40)
+			billboard.StudsOffset = Vector3.new(0, 2, 0)
+			billboard.AlwaysOnTop = true
+			billboard.Adornee = head
+			billboard.Parent = head
+
+			local nameLabel = Instance.new("TextLabel")
+			nameLabel.Size = UDim2.new(1, 0, 1, 0)
+			nameLabel.BackgroundTransparency = 1
+			nameLabel.TextColor3 = Color3.new(1, 1, 1)
+			nameLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+			nameLabel.TextStrokeTransparency = 0.5
+			nameLabel.TextScaled = true
+			nameLabel.Font = Enum.Font.SourceSansBold
+			nameLabel.Text = model.Name
+			nameLabel.Parent = billboard
+		end
+
+		local tag = Instance.new("BoolValue")
+		tag.Name = "ESP_Added"
+		tag.Parent = model
+
+		table.insert(addedESPModels, model)
+	end
+end
+
+local function clearESP()
+	for _, model in pairs(addedESPModels) do
+		if model and model:IsDescendantOf(workspace) then
+			for _, part in pairs(model:GetDescendants()) do
+				if part:IsA("BasePart") then
+					local box = part:FindFirstChild("ESPBox")
+					if box then box:Destroy() end
+				end
+				if part:IsA("BillboardGui") and part.Name == "NameESP" then
+					part:Destroy()
+				end
+			end
+			local tag = model:FindFirstChild("ESP_Added")
+			if tag then tag:Destroy() end
+		end
+	end
+	addedESPModels = {}
+end
+
+-- ESP frame update
+RunService.RenderStepped:Connect(function()
+	if espOn then
+		frameCounter += 1
+		if frameCounter % espEveryNFrames == 0 then
+			for _, model in pairs(workspace:GetDescendants()) do
+				if model:IsA("Model") and model:FindFirstChild("Humanoid") then
+					local humanoid = model:FindFirstChild("Humanoid")
+					local alreadyTagged = model:FindFirstChild("ESP_Added")
+
+					if not alreadyTagged and humanoid.Health > 0 then
+						addESP(model)
+					elseif onlyWhenAlive and alreadyTagged and humanoid.Health <= 0 then
+						for _, part in pairs(model:GetDescendants()) do
+							if part:IsA("BasePart") then
+								local box = part:FindFirstChild("ESPBox")
+								if box then box:Destroy() end
+							end
+							if part:IsA("BillboardGui") and part.Name == "NameESP" then
+								part:Destroy()
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+end)
+
+-- UI Toggles
+generalTab:CreateToggle({
+	Name = "Night Vision",
+	CurrentValue = false,
+	Callback = function(Value)
+		nightVisionOn = Value
+		if nightVisionOn then
+			enableLighting()
+		else
+			resetLighting()
+		end
+	end
 })
-Slider:Set(18)
 
--- Label example
-local CoolLabel = generalTab:CreateLabel("Label")
-CoolLabel:Set("Label New!")
-
--- Paragraph example
-local CoolParagraph = generalTab:CreateParagraph("Paragraph", "Paragraph Content")
-CoolParagraph:Set("Paragraph New!", "New Paragraph Content!")
-
--- Textbox example
-generalTab:CreateTextbox({
-    Name = "Textbox",
-    Default = "default box input",
-    TextDisappear = true,
-    Callback = function(Value)
-        print(Value)
-    end
+espTab:CreateToggle({
+	Name = "ESP",
+	CurrentValue = false,
+	Callback = function(Value)
+		espOn = Value
+		if not espOn then
+			clearESP()
+		end
+	end
 })
 
--- Bind example
-generalTab:CreateBind({
-    Name = "Bind",
-    Default = Enum.KeyCode.E,
-    Hold = false,
-    Callback = function()
-        print("Key pressed")
-    end
-})
-
--- Dropdown example
-generalTab:CreateDropdown({
-    Name = "Dropdown",
-    Default = "1",
-    Options = { "1", "2" },
-    Callback = function(Value)
-        print(Value)
-    end
-})
-
--- Final Rayfield Initialization
 Rayfield:LoadConfiguration()
