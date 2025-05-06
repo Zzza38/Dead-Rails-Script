@@ -385,9 +385,9 @@ renderConnection = RunService.RenderStepped:Connect(function()
 		end;
 	end;
 end);
-local generalTab = Window:CreateTab("General Settings", 92518365223638);
-local espTab = Window:CreateTab("ESP", 77626488648237);
-local aimbotTab = Window:CreateTab("Aimbot", 133705719422297);
+local generalTab = Window:CreateTab("General Settings", 140020355535548);
+local espTab = Window:CreateTab("ESP", 122410053148023);
+local aimbotTab = Window:CreateTab("Aimbot", 90837964489774);
 generalTab:CreateToggle({
 	Name = "ESP",
 	CurrentValue = espOn,
