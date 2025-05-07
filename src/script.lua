@@ -6,6 +6,7 @@ local RunService = game:GetService("RunService");
 local Lighting = game:GetService("Lighting");
 local workspace = game:GetService("Workspace");
 local localPlayer = Players.LocalPlayer;
+local workspaceDescendants = workspace:GetDescendants();
 local highlightMode;
 local currentEntity;
 local renderConnection;
@@ -13,7 +14,7 @@ local aimbotTargetBodyPart = "Head";
 local aimbotFallbackPart = "HumanoidRootPart";
 local nightVisionOn = false;
 local espOn = false;
-local Clipon = false;
+local noclipEnabled = false;
 local aimbotEnabled = false;
 local addedESPModels = {};
 local onlyWhenAlive = true;
@@ -288,7 +289,8 @@ renderConnection = RunService.RenderStepped:Connect(function()
 	if espOn then
 		frameCounter = frameCounter + 1;
 		if frameCounter % frameCount == 0 then
-			for _, model in pairs(workspace:GetDescendants()) do
+			workspaceDescendants = workspace:GetDescendants();
+			for _, model in pairs(workspaceDescendants) do
 				if model:IsA("Model") and model:FindFirstChild("Humanoid") then
 					local humanoid = model.Humanoid;
 					local tagged = model:FindFirstChild("ESP_Added");
@@ -330,7 +332,7 @@ renderConnection = RunService.RenderStepped:Connect(function()
 			local fovRadius = math.tan(math.rad(fovAngleDegrees / 2)) * camera.ViewportSize.X;
 			local closestNormal, closestPriority = nil, nil;
 			local closestNormalDist, closestPriorityDist = math.huge, math.huge;
-			for _, model in pairs(workspace:GetDescendants()) do
+			for _, model in pairs(workspaceDescendants) do
 				if model:IsA("Model") and model:FindFirstChild("HumanoidRootPart") and model:FindFirstChild("Humanoid") then
 					if not Players:GetPlayerFromCharacter(model) then
 						local targetPartName = aimbotTargetBodyPart or aimbotFallbackPart;
@@ -368,13 +370,13 @@ renderConnection = RunService.RenderStepped:Connect(function()
 				camera.CFrame = CFrame.new(camPos, smoothedLook);
 			end;
 			circle.Visible = showAimbotCircle;
-			if showAimbotCircle then
-				circle.Position = screenCenter;
-				circle.Radius = fovRadius;
-			end;
+			circle.Position = screenCenter;
+			circle.Radius = fovRadius;
 		end;
+	else
+		circle.Visible = false;
 	end;
-	if Clipon then
+	if noclipEnabled then
 		local char = game.Players.LocalPlayer.Character;
 		if char then
 			for _, part in pairs(char:GetDescendants()) do
@@ -384,11 +386,23 @@ renderConnection = RunService.RenderStepped:Connect(function()
 			end;
 		end;
 	end;
+	if nightVisionOn then
+		enableLighting();
+	else
+		resetLighting();
+	end;
 end);
 local generalTab = Window:CreateTab("General Settings", 140020355535548);
 local espTab = Window:CreateTab("ESP", 122410053148023);
 local aimbotTab = Window:CreateTab("Aimbot", 90837964489774);
-generalTab:CreateToggle({
+local keybindsTab = Window:CreateTab("Keybinds", 97114020880902);
+local uiElements = {
+	general = {},
+	esp = {},
+	aimbot = {},
+	keybinds = {}
+};
+uiElements.general.espToggle = generalTab:CreateToggle({
 	Name = "ESP",
 	CurrentValue = espOn,
 	Flag = "espToggle",
@@ -399,7 +413,7 @@ generalTab:CreateToggle({
 		end;
 	end
 });
-generalTab:CreateToggle({
+uiElements.general.nightVisionToggle = generalTab:CreateToggle({
 	Name = "Night Vision",
 	CurrentValue = nightVisionOn,
 	Flag = "nightVisionToggle",
@@ -412,15 +426,15 @@ generalTab:CreateToggle({
 		end;
 	end
 });
-generalTab:CreateToggle({
+uiElements.general.noclipToggle = generalTab:CreateToggle({
 	Name = "Noclip",
-	CurrentValue = Clipon,
+	CurrentValue = noclipEnabled,
 	Flag = "noclip",
 	Callback = function(Value)
-		Clipon = Value;
+		noclipEnabled = Value;
 	end
 });
-generalTab:CreateToggle({
+uiElements.general.aimbotToggle = generalTab:CreateToggle({
 	Name = "Aimbot",
 	CurrentValue = aimbotEnabled,
 	Flag = "aimbotToggle",
@@ -428,7 +442,7 @@ generalTab:CreateToggle({
 		aimbotEnabled = Value;
 	end
 });
-generalTab:CreateButton({
+uiElements.general.unloadScriptButton = generalTab:CreateButton({
 	Name = "Unload Script",
 	Callback = function()
 		if renderConnection then
@@ -440,7 +454,7 @@ generalTab:CreateButton({
 		Rayfield:Destroy();
 	end
 });
-generalTab:CreateButton({
+uiElements.general.reloadScriptButton = generalTab:CreateButton({
 	Name = "Reload Script",
 	Callback = function()
 		if renderConnection then
@@ -453,7 +467,7 @@ generalTab:CreateButton({
 		Rayfield:Destroy();
 	end
 });
-espTab:CreateToggle({
+uiElements.esp.onlyWhenAliveToggle = espTab:CreateToggle({
 	Name = "Only Show Alive Entities",
 	CurrentValue = onlyWhenAlive,
 	Flag = "onlyWhenAlive",
@@ -461,7 +475,7 @@ espTab:CreateToggle({
 		onlyWhenAlive = Value;
 	end
 });
-espTab:CreateToggle({
+uiElements.esp.customEntityHighlightToggle = espTab:CreateToggle({
 	Name = "Custom Highlight Entities",
 	CurrentValue = highlightEnabled,
 	Flag = "entityHighlight",
@@ -474,7 +488,7 @@ espTab:CreateToggle({
 		end;
 	end
 });
-espTab:CreateSlider({
+uiElements.esp.espUpdateSpeed = espTab:CreateSlider({
 	Name = "ESP Update Speed",
 	Range = {
 		1,
@@ -492,7 +506,7 @@ espTab:CreateParagraph({
 	Title = "Change Highlight Mode",
 	Content = "To change the highlight mode for any defined entity, pick it from the dropdown, click the button, and pick its mode in the second dropdown.\n\n The ignore mode removes the label but keeps the ESP, and None completely removes the ESP."
 });
-espTab:CreateDropdown({
+uiElements.esp.entityPicker = espTab:CreateDropdown({
 	Name = "Entity Picker",
 	Options = keys(readableHighlightModes),
 	CurrentOption = currentEntity,
@@ -503,7 +517,7 @@ espTab:CreateDropdown({
 		highlightMode = capitalizeFirst(readableHighlightModes[currentEntity]);
 	end
 });
-espTab:CreateDropdown({
+uiElements.esp.entityModePicker = espTab:CreateDropdown({
 	Name = "Entity Highlight Mode",
 	Options = {
 		"Highlight",
@@ -541,7 +555,7 @@ aimbotTab:CreateParagraph({
 	Title = "Priority Radius",
 	Content = "When the aimbot is enabled, a dangerous entity within the priority radius will be auto snapped on for shooting. The FOV circle is ignored."
 });
-aimbotTab:CreateSlider({
+uiElements.aimbot.enemyPriorityRadius = aimbotTab:CreateSlider({
 	Name = "Enemy Priority Radius",
 	Range = {
 		0,
@@ -555,7 +569,7 @@ aimbotTab:CreateSlider({
 		priorityRadius = Value;
 	end
 });
-aimbotTab:CreateSlider({
+uiElements.aimbot.fovAngleDegrees = aimbotTab:CreateSlider({
 	Name = "Aimbot FOV",
 	Range = {
 		5,
@@ -569,7 +583,7 @@ aimbotTab:CreateSlider({
 		fovAngleDegrees = Value;
 	end
 });
-aimbotTab:CreateToggle({
+uiElements.aimbot.showAimbotCircle = aimbotTab:CreateToggle({
 	Name = "Show Aimbot FOV Circle",
 	CurrentValue = showAimbotCircle,
 	Flag = "showAimbotCircle",
@@ -578,7 +592,7 @@ aimbotTab:CreateToggle({
 		circle.Visible = showAimbotCircle;
 	end
 });
-aimbotTab:CreateColorPicker({
+uiElements.aimbot.circleColor = aimbotTab:CreateColorPicker({
 	Name = "Circle Color",
 	Color = circleColor,
 	Flag = "aimbotCircleColor",
@@ -587,7 +601,7 @@ aimbotTab:CreateColorPicker({
 		circle.Color = circleColor;
 	end
 });
-aimbotTab:CreateSlider({
+uiElements.aimbot.circleThickness = aimbotTab:CreateSlider({
 	Name = "Circle Thickness",
 	Range = {
 		0.1,
@@ -602,7 +616,7 @@ aimbotTab:CreateSlider({
 		circle.Thickness = circleThickness;
 	end
 });
-aimbotTab:CreateSlider({
+uiElements.aimbot.circleTransparency = aimbotTab:CreateSlider({
 	Name = "Circle Transparency",
 	Range = {
 		0,
@@ -615,5 +629,42 @@ aimbotTab:CreateSlider({
 	Callback = function(Value)
 		circleTransparency = Value / 100;
 		circle.Transparency = circleTransparency;
+	end
+});
+local keybinds = {};
+keybindsTab:CreateKeybind({
+	Name = "ESP Keybind",
+	CurrentKeybind = keybinds.esp,
+	HoldToInteract = false,
+	Flag = "espKeybind",
+	Callback = function(Keybind)
+		uiElements.general.espToggle:Set(not espOn);
+	end
+});
+keybindsTab:CreateKeybind({
+	Name = "Night Vision Keybind",
+	CurrentKeybind = keybinds.nightVision,
+	HoldToInteract = false,
+	Flag = "nightVisionKeybind",
+	Callback = function(Keybind)
+		uiElements.general.espToggle:Set(not nightVisionOn);
+	end
+});
+keybindsTab:CreateKeybind({
+	Name = "ESP Keybind",
+	CurrentKeybind = keybinds.noclip,
+	HoldToInteract = false,
+	Flag = "noclipKeybind",
+	Callback = function(Keybind)
+		uiElements.general.espToggle:Set(not noclipEnabled);
+	end
+});
+keybindsTab:CreateKeybind({
+	Name = "Aimbot Keybind",
+	CurrentKeybind = keybinds.aimbot,
+	HoldToInteract = false,
+	Flag = "aimbotKeybind",
+	Callback = function(Keybind)
+		uiElements.general.espToggle:Set(not aimbotEnabled);
 	end
 });
