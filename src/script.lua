@@ -1,5 +1,4 @@
 local Rayfield = (loadstring(game:HttpGet("https://sirius.menu/rayfield")))();
-local helpers = (loadstring(game:HttpGet("https://github.com/Zzza38/Dead-Rails-Script/raw/refs/heads/main/src/helperFunctions.lua")))();
 local UserInputService = game:GetService("UserInputService");
 local Players = game:GetService("Players");
 local RunService = game:GetService("RunService");
@@ -34,7 +33,110 @@ circle.Thickness = circleThickness;
 circle.Transparency = circleTransparency;
 circle.Visible = showAimbotCircle;
 circle.Filled = false;
-local defaultNPCModes = {
+local itemDefinitions = {};
+local entityDefinitions = {
+	Model_Unicorn = {
+		name = "Unicorn",
+		highlight = "highlight",
+		tags = {}
+	},
+	Model_Banker = {
+		name = "Banker",
+		highlight = "highlight",
+		tags = { "aimbot", "enemy" }
+	},
+	Model_Werewolf = {
+		name = "Werewolf",
+		highlight = "warn",
+		tags = { "aimbot", "enemy" }
+	},
+	Model_RevolverOutlaw = {
+		name = "Outlaw (Revolver)",
+		highlight = "warn",
+		tags = { "aimbot", "enemy" }
+	},
+	Model_RifleOutlaw = {
+		name = "Outlaw (Rifle)",
+		highlight = "warn",
+		tags = { "aimbot", "enemy" }
+	},
+	Model_ShotgunOutlaw = {
+		name = "Outlaw (Shotgun)",
+		highlight = "warn",
+		tags = { "aimbot", "enemy" }
+	},
+	Model_ZombieMiner = {
+		name = "Bomber Zombie",
+		highlight = "warn",
+		tags = { "aimbot", "enemy", "kill-first" }
+	},
+	Model_ZombieSheriff = {
+		name = "Sheriff Zombie",
+		highlight = "warn",
+		tags = { "aimbot", "enemy", "kill-first" }
+	},
+	Model_Vampire = {
+		name = "Vampire",
+		highlight = "warn",
+		tags = { "aimbot", "enemy" }
+	},
+	Model_Runner = {
+		name = "Zombie (Fast)",
+		highlight = "ignore",
+		tags = { "aimbot", "enemy" }
+	},
+	Model_Walker = {
+		name = "Zombie (Slow)",
+		highlight = "ignore",
+		tags = { "aimbot", "enemy" }
+	},
+	Model_Horse = {
+		name = "Horse",
+		highlight = "ignore",
+		tags = {}
+	},
+	Model_Wolf = {
+		name = "Wolf",
+		highlight = "ignore",
+		tags = {}
+	},
+	Model_RifleSoldier = {
+		name = "Ground Soldier",
+		highlight = "none",
+		tags = {}
+	},
+	Model_TurretSoldier = {
+		name = "Turret Soldier",
+		highlight = "none",
+		tags = {}
+	},
+	Shopkeeper = {
+		name = "Shopkeeper",
+		highlight = "none",
+		tags = {}
+	},
+	Model_ArmoredZombie = {
+		name = "Zombie (Armor)",
+		highlight = "none",
+		tags = { "aimbot", "enemy" }
+	},
+	Model_ZombieRevolverSoldier = {
+		name = "Zombie (Revolver)",
+		highlight = "",
+		tags = { "aimbot", "enemy" }
+	},
+	Model_ZombieRifleSoldier = {
+		name = "Zombie (Rifle)",
+		highlight = "",
+		tags = { "aimbot", "enemy" }
+	},
+	Model_ZombieShotgunSoldier = {
+		name = "Zombie (Shotgun)",
+		highlight = "",
+		tags = { "aimbot", "enemy" }
+	}
+};
+local defaultEntityHighlightModes = {
 	Model_Unicorn = "highlight",
 	Model_Banker = "highlight",
 	Model_Werewolf = "warn",
@@ -56,7 +158,7 @@ local defaultNPCModes = {
 	Model_ZombieShotgunSoldier = "",
 	Model_ArmoredZombie = ""
 };
-local NPCNames = {
+local entityNames = {
 	Model_Unicorn = "Unicorn",
 	Model_Werewolf = "Werewolf",
 	Model_Runner = "Zombie (Fast)",
@@ -144,16 +246,16 @@ local entityTags = {
 		"enemy"
 	}
 };
-local playerChosenModes = table.clone(defaultNPCModes);
-local importantNPCs = table.clone(playerChosenModes);
+local playerChosenEntityHighlightModes = table.clone(defaultEntityHighlightModes);
+local entityHighlightModes = table.clone(playerChosenEntityHighlightModes);
 local readableHighlightModes = {};
-for internalName, mode in pairs(defaultNPCModes) do
-	local readableName = NPCNames[internalName] or internalName;
+for internalName, mode in pairs(defaultEntityHighlightModes) do
+	local readableName = entityNames[internalName] or internalName;
 	readableHighlightModes[readableName] = mode;
 end;
 local readableToInternal = {};
-for internalName, mode in pairs(playerChosenModes) do
-	local readableName = NPCNames[internalName] or internalName;
+for internalName, mode in pairs(playerChosenEntityHighlightModes) do
+	local readableName = entityNames[internalName] or internalName;
 	readableToInternal[readableName] = internalName;
 end;
 local rayfieldConfig = {
@@ -165,7 +267,7 @@ local rayfieldConfig = {
 	DisableRayfieldPrompts = false,
 	DisableBuildWarnings = false,
 	ConfigurationSaving = {
-		Enabled = false,
+		Enabled = true,
 		FolderName = nil,
 		FileName = "dead-rails"
 	},
@@ -188,6 +290,16 @@ local rayfieldConfig = {
 	}
 };
 local Window = Rayfield:CreateWindow(rayfieldConfig);
+local function keys(tbl)
+	local result = {};
+	for k, _ in pairs(tbl) do
+		table.insert(result, k);
+	end;
+	return result;
+end;
+local function capitalizeFirst(str)
+	return (str:sub(1, 1)):upper() .. (str:sub(2)):lower();
+end;
 local function enableLighting()
 	Lighting.Ambient = Color3.new(1, 1, 1);
 	Lighting.Brightness = 5;
@@ -199,13 +311,69 @@ local function resetLighting()
 	Lighting.Brightness = 2;
 	Lighting.OutdoorAmbient = Color3.new(0, 0, 0);
 end;
-local function addESP(model)
+local function addEntityESP(model)
 	if model:FindFirstChild("Humanoid") and (not model:FindFirstChild("ESP_Added")) then
 		if Players:GetPlayerFromCharacter(model) then
 			return;
 		end;
-		local mode = importantNPCs[model.Name];
-		local name = NPCNames[model.Name] or model.Name;
+		local mode = entityHighlightModes[model.Name];
+		local name = entityNames[model.Name] or model.Name;
+		local color = Color3.new(1, 0, 0);
+		if mode == "none" then
+			return;
+		end;
+		if mode == "highlight" then
+			color = Color3.fromRGB(0, 255, 0);
+		elseif mode == "warn" then
+			color = Color3.fromRGB(255, 255, 0);
+		end;
+		for _, part in pairs(model:GetDescendants()) do
+			if part:IsA("BasePart") then
+				local box = Instance.new("BoxHandleAdornment");
+				box.Size = part.Size;
+				box.Adornee = part;
+				box.AlwaysOnTop = true;
+				box.ZIndex = 10;
+				box.Transparency = 0.5;
+				box.Color3 = color;
+				box.Name = "ESPBox";
+				box.Parent = part;
+			end;
+		end;
+		local head = model:FindFirstChild("Head");
+		if head and mode ~= "ignore" then
+			local billboard = Instance.new("BillboardGui");
+			billboard.Name = "NameESP";
+			billboard.Size = UDim2.new(0, 150, 0, 40);
+			billboard.StudsOffset = Vector3.new(0, 2, 0);
+			billboard.AlwaysOnTop = true;
+			billboard.Adornee = head;
+			billboard.Parent = head;
+			local nameLabel = Instance.new("TextLabel");
+			nameLabel.Size = UDim2.new(1, 0, 1, 0);
+			nameLabel.BackgroundTransparency = 1;
+			nameLabel.TextColor3 = Color3.new(1, 1, 1);
+			nameLabel.TextStrokeColor3 = Color3.new(0, 0, 0);
+			nameLabel.TextStrokeTransparency = 0.5;
+			nameLabel.TextScaled = true;
+			nameLabel.Font = Enum.Font.SourceSansBold;
+			nameLabel.Text = name;
+			if mode == "warn" then
+				warnNPCLabels[model] = nameLabel;
+			end;
+			nameLabel.Parent = billboard;
+		end;
+		local tag = Instance.new("BoolValue");
+		tag.Name = "ESP_Added";
+		tag.Parent = model;
+		table.insert(addedESPModels, model);
+	end;
+end;
+local function addItemESP(model)
+	if not model:FindFirstChild("ESP_Added") then
+        -- need to replace with itemDefinitions
+		local mode = itemHighlightModes[model.Name];
+		local name = itemNames[model.Name] or model.Name;
 		local color = Color3.new(1, 0, 0);
 		if mode == "none" then
 			return;
@@ -295,7 +463,7 @@ renderConnection = RunService.RenderStepped:Connect(function()
 					local humanoid = model.Humanoid;
 					local tagged = model:FindFirstChild("ESP_Added");
 					if not tagged and humanoid.Health > 0 then
-						addESP(model);
+						addEntityESP(model);
 					elseif onlyWhenAlive and tagged and humanoid.Health <= 0 then
 						for _, part in pairs(model:GetDescendants()) do
 							if part:IsA("BasePart") then
@@ -314,7 +482,7 @@ renderConnection = RunService.RenderStepped:Connect(function()
 			for model, label in pairs(warnNPCLabels) do
 				if model:IsDescendantOf(workspace) and localPlayer and localPlayer.Character then
 					local distance = 0;
-					local name = NPCNames[model.Name] or model.Name;
+					local name = entityNames[model.Name] or model.Name;
 					if localPlayer and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") and model:FindFirstChild("HumanoidRootPart") then
 						distance = math.floor((localPlayer.Character.HumanoidRootPart.Position - model.HumanoidRootPart.Position).Magnitude);
 					end;
@@ -442,7 +610,16 @@ uiElements.general.aimbotToggle = generalTab:CreateToggle({
 		aimbotEnabled = Value;
 	end
 });
-uiElements.general.unloadScriptButton = generalTab:CreateButton({
+generalTab:CreateButton({
+	Name = "Disable All",
+	Callback = function()
+		uiElements.general.espToggle:Set(false);
+		uiElements.general.nightVisionToggle:Set(false);
+		uiElements.general.noclipToggle:Set(false);
+		uiElements.general.aimbotToggle:Set(false);
+	end
+});
+generalTab:CreateButton({
 	Name = "Unload Script",
 	Callback = function()
 		if renderConnection then
@@ -454,7 +631,7 @@ uiElements.general.unloadScriptButton = generalTab:CreateButton({
 		Rayfield:Destroy();
 	end
 });
-uiElements.general.reloadScriptButton = generalTab:CreateButton({
+generalTab:CreateButton({
 	Name = "Reload Script",
 	Callback = function()
 		if renderConnection then
@@ -482,7 +659,7 @@ uiElements.esp.customEntityHighlightToggle = espTab:CreateToggle({
 	Callback = function(Value)
 		highlightEnabled = Value;
 		if Value then
-			importantNPCs = table.clone(playerChosenModes);
+			importantNPCs = table.clone(playerChosenEntityHighlightModes);
 		else
 			importantNPCs = {};
 		end;
@@ -530,8 +707,8 @@ uiElements.esp.entityModePicker = espTab:CreateDropdown({
 	Flag = "entityModePicker",
 	Callback = function(Options)
 		highlightMode = Options[1];
-		playerChosenModes[readableToInternal[currentEntity]] = string.lower(highlightMode);
-		importantNPCs = table.clone(playerChosenModes);
+		playerChosenEntityHighlightModes[readableToInternal[currentEntity]] = string.lower(highlightMode);
+		importantNPCs = table.clone(playerChosenEntityHighlightModes);
 		clearESP();
 	end
 });
@@ -631,10 +808,9 @@ uiElements.aimbot.circleTransparency = aimbotTab:CreateSlider({
 		circle.Transparency = circleTransparency;
 	end
 });
-local keybinds = {};
 keybindsTab:CreateKeybind({
 	Name = "ESP Keybind",
-	CurrentKeybind = keybinds.esp,
+	CurrentKeybind = nil,
 	HoldToInteract = false,
 	Flag = "espKeybind",
 	Callback = function(Keybind)
@@ -643,28 +819,28 @@ keybindsTab:CreateKeybind({
 });
 keybindsTab:CreateKeybind({
 	Name = "Night Vision Keybind",
-	CurrentKeybind = keybinds.nightVision,
+	CurrentKeybind = nil,
 	HoldToInteract = false,
 	Flag = "nightVisionKeybind",
 	Callback = function(Keybind)
-		uiElements.general.espToggle:Set(not nightVisionOn);
+		uiElements.general.nightVisionToggle:Set(not nightVisionOn);
 	end
 });
 keybindsTab:CreateKeybind({
 	Name = "ESP Keybind",
-	CurrentKeybind = keybinds.noclip,
+	CurrentKeybind = nil,
 	HoldToInteract = false,
 	Flag = "noclipKeybind",
 	Callback = function(Keybind)
-		uiElements.general.espToggle:Set(not noclipEnabled);
+		uiElements.general.noclipToggle:Set(not noclipEnabled);
 	end
 });
 keybindsTab:CreateKeybind({
 	Name = "Aimbot Keybind",
-	CurrentKeybind = keybinds.aimbot,
+	CurrentKeybind = nil,
 	HoldToInteract = false,
 	Flag = "aimbotKeybind",
 	Callback = function(Keybind)
-		uiElements.general.espToggle:Set(not aimbotEnabled);
+		uiElements.general.aimbotToggle:Set(not aimbotEnabled);
 	end
 });
